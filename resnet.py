@@ -9,15 +9,6 @@ def init_weights(m):
         init.kaiming_normal_(m.weight)
 
 
-class ShortcutHelper(nn.Module):
-    def __init__(self, expr):
-        super(ShortcutHelper, self).__init__()
-        self.expr = expr
-
-    def forward(self, src):
-        return self.expr(src)
-
-
 class ConvBlock(nn.Module):
     expansion = 1
 
@@ -32,16 +23,21 @@ class ConvBlock(nn.Module):
                                stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(num_features=channels)
 
-        self.res_connection = nn.Sequential()
+        self.res_connection = None
         if stride != 1 or in_channels != channels:
-            # All the shortcuts are identity shortcuts in the original paper for CIFAR-10 dataset
-            self.res_connection = ShortcutHelper(
-                lambda x: F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, channels // 4, channels // 4), 'constant', 0))
+            self.res_connection = nn.Sequential(
+                nn.Conv2d(in_channels=in_channels, out_channels=self.expansion * channels,
+                          kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(num_features=self.expansion * channels)
+            )
 
     def forward(self, src):
         out = F.relu(self.bn1(self.conv1(src)))
         out = self.bn2(self.conv2(out))
-        out += self.res_connection(src)
+        if self.res_connection is not None:
+            out += self.res_connection(src)
+        else:
+            out += src
         out = F.relu(out)
         return out
 
