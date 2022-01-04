@@ -1,0 +1,7 @@
+albumentations
+matplotlib
+numpy
+scipy
+sklearn
+torch
+ipython
